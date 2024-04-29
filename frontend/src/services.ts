@@ -114,7 +114,7 @@ export namespace Db {
       constructor(public db: Db) {}
 
       get(options?: RequestInit): Promise<ToDo[]> {
-        return this.db.get('./data/todos.json', options);
+        return this.db.get('/api/v1/todos', options);
       }
     }
   }

@@ -19,3 +19,8 @@ docker container run --rm \
   --publish 3443:3443 \
   -d nginx
 ```
+Test with curl:
+```bash
+curl https://local.spamfro.site:3443/api/v1/todos
+curl https://local.spamfro.site:3443/todo/
+```
