@@ -1,20 +1,37 @@
-import React, { createContext, useReducer, useEffect, ReactNode } from 'react';
-import { loadState, storeState, reducer, State, Action } from './model.store';
+import React, { createContext, useReducer, useEffect, ReactNode, useRef } from 'react';
+import { hydrateState, persistState, reducer, State, Action } from './model.store';
 
-export const StateContext = createContext<State>({});  // empty default
-export const DispatchContext = createContext<React.Dispatch<Action>>(()=>{}); // noop default
-
-const initialState = loadState(window.localStorage);
+export const StateContext = createContext<State>({});
+export const DispatchContext = createContext<React.Dispatch<Action>>(() => {});
 
 interface StoreProviderProps {
   children: ReactNode;
 }
 
 export function StoreProvider({ children }: StoreProviderProps) {
-  const [state, dispatch] = useReducer(reducer, initialState);
-
+  const [state, dispatch] = useReducer(reducer, {}, (initialState) => {
+    return hydrateState(initialState, window.localStorage);
+  });
+  const ref = useRef<State | undefined>();
+  
   useEffect(() => {
-    return () => { storeState(state, window.localStorage) };
+    ref.current = state;
+  }, [state]);
+  
+  useEffect(() => {
+    function commitState() {
+      if (ref.current) {
+        persistState(ref.current, window.localStorage);
+        ref.current = undefined;
+      }
+    };
+    window.addEventListener('beforeunload', commitState);
+    document.addEventListener('visibilitychange', commitState);
+    return () => {
+      window.removeEventListener('beforeunload', commitState);
+      document.removeEventListener('visibilitychange', commitState);
+      commitState();
+    };
   }, []);
   
   return (

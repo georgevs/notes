@@ -113,8 +113,11 @@ export namespace Db {
     export class ToDos {
       constructor(public db: Db) {}
 
-      get(options?: RequestInit): Promise<ToDo[]> {
+      getAll(options?: RequestInit): Promise<ToDo[]> {
         return this.db.get('/api/v1/todos', options);
+      }
+      get(id: number, options?: RequestInit): Promise<ToDo[]> {
+        return this.db.get(`/api/v1/todos/${id}`, options);
       }
     }
   }

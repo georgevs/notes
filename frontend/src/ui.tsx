@@ -1,4 +1,4 @@
-import { useContext, useEffect } from 'react';
+import { useContext, useEffect, useMemo } from 'react';
 import { ServicesProvider, ServicesContext } from './ui.services-context';
 import { StoreProvider, StateContext, DispatchContext } from './ui.store-context';
 import { ToDo } from './services';
@@ -13,30 +13,59 @@ export default function App() {
   );
 }
 
-function ToDoPage() {
+interface Io {
+  controller?: AbortController;
+  cancelFetch(): void,
+  fetch(): void
+}
+
+function useIo(): Io | undefined {
   const services = useContext(ServicesContext);
-  const state = useContext(StateContext);
   const dispatch = useContext(DispatchContext);
 
-  useEffect(() => {
-    let canceled = false;
-    const controller = new AbortController();
-    if (services) {
+  const io = useMemo<Io | undefined>(() => (!services ? undefined : {
+    cancelFetch() {
+      this.controller?.abort();
+    },
+    fetch() {
+      const prevController = this.controller;
+      this.controller = new AbortController();
+      const { signal } = this.controller;
+      prevController?.abort();
       dispatch({ type: 'LOADING' });
-      services.datasets!.todos.get({ signal: controller.signal })
-        .then(todos => { !canceled && dispatch({ type: 'LOADED', payload: todos }) })
-        .catch(error => { !canceled && dispatch({ type: 'LOAD_ERROR', payload: error }) });
+      services.datasets!.todos.getAll({ signal })
+        .then(todos => { !signal.aborted && dispatch({ type: 'LOADED', payload: todos }) })
+        .catch(error => { this.controller!.signal === signal && dispatch({ type: 'LOAD_ERROR', payload: error }) });
     }
-    return () => { canceled = true; controller.abort() }
-  }, [services]);
-  
-  const { message, error, todos } = state;
-  
+  }), [services, dispatch]);
+
+  return io;
+}
+
+function ToDoPage() {
+  const state = useContext(StateContext);
+  const io = useIo();
+
+  useEffect(() => {
+    if (io) {
+      io.fetch();
+      return io.cancelFetch.bind(io);
+    }
+  }, [io]);
+
+  const { message, error, todos, isLoading } = state;
+  const canceled = error?.name === 'AbortError';
+
   return (
     <>
       {message && <Message message={message} />}
-      {error && <Message className='error' message={error.message} />}
+      {error && !canceled && <Message className='error' message={error.message} />}
+      {canceled && <Message className='warning' message={'Canceled!'} />}
       {todos && <ToDosList todos={todos} />}
+      <div className='actions'>
+        {io && !isLoading && <button onClick={io.fetch.bind(io)}>Fetch</button>}
+        {isLoading && <button onClick={io!.cancelFetch.bind(io)}>Cancel</button>}
+      </div>
     </>
   );
 }
@@ -55,12 +84,13 @@ function Message({ className, message }: MessageProps) {
 interface ToDosListProps {
   todos: ToDo[];
 }
+
 function ToDosList({ todos }: ToDosListProps) {
   return (
-    <ul className='todos'>
+    <ol className='todos'>
       {todos.map(({ id, text }) => (
         <li key={id}>{text}</li>
       ))}
-    </ul>
+    </ol>
   );
 }

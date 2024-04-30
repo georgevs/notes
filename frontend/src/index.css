@@ -14,3 +14,12 @@ body {
 .d-none {
   display: none;
 }
+div.actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 1em;
+}
+ol.todos {
+  list-style-type: decimal;
+}
